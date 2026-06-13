@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신나는 집안 청소 룰렛 🧹</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8;
+        }
+        /* 룰렛 캔버스 스타일링 */
+        #roulette-container {
+            position: relative;
+            user-select: none;
+        }
+        /* 회전하는 동안의 그림자 효과 */
+        .spinning {
+            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.15));
+        }
+        /* 로딩 바 애니메이션 */
+        @keyframes loadingBar {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+        .animate-loading-bar {
+            animation: loadingBar 1.5s infinite linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-md shadow-indigo-100 flex items-center justify-center">
+                    <i class="fa-solid fa-broom text-xl animate-bounce"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-indigo-950 flex items-center gap-2">
+                        집안 청소 룰렛
+                    </h1>
+                    <p class="text-xs text-slate-500">지루한 집안일, 이제 룰렛으로 공평하고 즐겁게 나누어 보세요!</p>
+                </div>
+            </div>
+            <!-- 프리셋 퀵 로더 -->
+            <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <span class="text-xs font-semibold text-slate-500 shrink-0">프리셋 추천:</span>
+                <button onclick="loadPreset('chores')" class="px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition shrink-0">🧹 청소 항목</button>
+                <button onclick="loadPreset('members')" class="px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition shrink-0">👨‍👩‍👧‍👦 우리 가족</button>
+                <button onclick="loadPreset('penalties')" class="px-3 py-1.5 text-xs font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition shrink-0">🔥 벌칙 내기</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 레이아웃 -->
+    <main class="max-w-6xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow">
+        
+        <!-- 왼쪽: 룰렛 휠 영역 -->
+        <div class="lg:col-span-7 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center min-h-[500px]">
+            <!-- 상단 상태바 및 효과음 조절 -->
+            <div class="w-full flex justify-between items-center mb-6">
+                <div id="status-message" class="text-sm font-semibold text-slate-500">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5 animate-ping"></span> 준비 완료! 룰렛을 돌려보세요.
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="sound-btn" onclick="toggleSound()" class="text-slate-500 hover:text-indigo-600 p-2 rounded-lg bg-slate-50 hover:bg-indigo-50 transition" title="효과음 켜기/끄기">
+                        <i class="fa-solid fa-volume-high text-lg"></i>
+                    </button>
+                    <button onclick="resetRoulette()" class="text-slate-500 hover:text-rose-600 p-2 rounded-lg bg-slate-50 hover:bg-rose-50 transition" title="룰렛 초기화">
+                        <i class="fa-solid fa-arrow-rotate-left text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 룰렛 보드 시각화 컨테이너 -->
+            <div id="roulette-container" class="relative w-full max-w-[360px] aspect-square flex items-center justify-center">
+                <!-- 상단 지시핀 (포인터) -->
+                <div class="absolute -top-3 z-20 flex flex-col items-center">
+                    <div class="w-6 h-6 bg-red-600 rounded-full shadow-md flex items-center justify-center border-2 border-white">
+                        <i class="fa-solid fa-arrow-down text-white text-xs"></i>
+                    </div>
+                    <div class="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[14px] border-t-red-600"></div>
+                </div>
+
+                <!-- 룰렛 메인 캔버스 -->
+                <canvas id="rouletteCanvas" width="360" height="360" class="rounded-full shadow-lg border-4 border-slate-100 transition-all duration-300"></canvas>
+                
+                <!-- 중앙 중심 장식용 핀 (스핀 버튼 역할 가능) -->
+                <button id="spin-center-btn" onclick="spinWheel()" class="absolute w-16 h-16 bg-slate-900 border-4 border-white text-white font-bold rounded-full shadow-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer">
+                    <span class="text-xs font-black tracking-widest text-indigo-400">SPIN</span>
+                </button>
+            </div>
+
+            <!-- 하단 핵심 조작 버튼 -->
+            <div class="w-full mt-8 flex flex-col sm:flex-row gap-3">
+                <button onclick="spinWheel()" id="spin-btn" class="flex-grow py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-2xl shadow-lg shadow-indigo-100 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-play text-xl"></i> 룰렛 힘차게 돌리기!
+                </button>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 항목 관리 및 기록 -->
+        <div class="lg:col-span-5 flex flex-col gap-6 w-full">
+            <!-- 항목 추가/편집 카드 -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-950 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-600"></i> 항목 관리
+                    </h2>
+                    <span id="item-count" class="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">항목 6개</span>
+                </div>
+
+                <!-- 항목 추가 인풋 -->
+                <form onsubmit="addItem(event)" class="flex gap-2 mb-4">
+                    <input type="text" id="new-item-input" placeholder="새 청소일/사람을 입력하세요" maxlength="15" class="flex-grow px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition shrink-0 flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> 추가
+                    </button>
+                </form>
+
+                <!-- 현재 항목 스크롤 리스트 -->
+                <div id="items-list" class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    <!-- JS로 동적 생성됨 -->
+                </div>
+            </div>
+
+            <!-- 당첨 기록 (히스토리) -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex-grow">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-950 flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i> 당첨 히스토리
+                    </h2>
+                    <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-rose-500 transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> 전체 삭제
+                    </button>
+                </div>
+
+                <!-- 히스토리 목록 -->
+                <div id="history-list" class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                    <p class="text-sm text-slate-400 text-center py-6">아직 기록이 없습니다. 먼저 룰렛을 돌려보세요!</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 당첨 결과 오버레이 모달 (커스텀 팝업) -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl border border-indigo-50 flex flex-col items-center text-center transform scale-95 transition-transform duration-300 relative z-50 max-h-[85vh] overflow-y-auto" id="modal-content">
+            <!-- 트로피 아이콘 또는 이모지 -->
+            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-3xl mb-3 animate-bounce">
+                🚀
+            </div>
+            <p class="text-xs uppercase tracking-widest font-bold text-indigo-500 mb-1">오늘의 청소 당첨자!</p>
+            <h3 id="modal-winner-text" class="text-3xl font-extrabold text-indigo-950 mb-3 break-words px-2 w-full">홍길동</h3>
+            
+            <!-- 당첨 정보 및 역동적인 10초 타이머 표시 영역 -->
+            <p class="text-sm text-slate-500 mb-4 leading-relaxed w-full">
+                하늘이 내린 임무입니다!<br>기쁜 마음으로 청소를 시작해보세요. 🥰
+            </p>
+
+            <!-- ✨ AI 비서 섹션 -->
+            <div id="ai-section" class="w-full border-t border-slate-100 pt-4 mb-6 flex flex-col items-center">
+                <!-- AI 호출 버튼 -->
+                <button id="ai-btn" onclick="getAICoaching()" class="w-full py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>✨ AI 청소 비서의 처방 받기</span>
+                </button>
+
+                <!-- AI 로딩 바 -->
+                <div id="ai-loading" class="hidden flex flex-col items-center py-5 w-full animate-pulse">
+                    <i class="fa-solid fa-broom text-indigo-500 text-xl animate-spin mb-2"></i>
+                    <p class="text-xs text-indigo-600 font-semibold">AI 청소 비서가 맞춤형 처방전을 작성하는 중...</p>
+                    <div class="w-2/3 h-1.5 bg-indigo-100 rounded-full overflow-hidden mt-3 relative">
+                        <div class="absolute h-full w-1/2 bg-indigo-600 rounded-full animate-loading-bar"></div>
+                    </div>
+                </div>
+
+                <!-- AI 에러 메시지 -->
+                <div id="ai-error" class="hidden text-rose-500 text-xs py-3 text-center">
+                    <i class="fa-solid fa-circle-exclamation mr-1"></i> <span>가이드를 가져오지 못했습니다. 다시 시도해주세요.</span>
+                </div>
+
+                <!-- AI 컨텐츠 카드 -->
+                <div id="ai-content" class="hidden w-full text-left bg-indigo-50/50 border border-indigo-100/60 rounded-2xl p-4 mt-3">
+                    <!-- 격려 한마디 (Nagging) -->
+                    <div class="relative bg-white border border-indigo-100 p-3 rounded-2xl text-xs text-indigo-950 font-medium mb-3 shadow-sm">
+                        <div class="absolute -top-1.5 left-6 w-3 h-3 bg-white border-t border-l border-indigo-100 transform rotate-45"></div>
+                        <span class="text-indigo-600 font-extrabold mr-1">💬 한마디:</span> <span id="ai-nagging"></span>
+                    </div>
+
+                    <!-- 3단계 가이드 -->
+                    <div class="mb-3">
+                        <h4 class="text-xs font-black text-indigo-950 mb-1.5 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-ol text-indigo-500"></i> 10분 해결 초스피드 코스
+                        </h4>
+                        <ol class="space-y-1 text-xs text-slate-700 pl-1 list-decimal list-inside" id="ai-steps">
+                        </ol>
+                    </div>
+
+                    <!-- 꿀팁 가이드 -->
+                    <div class="bg-indigo-600 text-white rounded-xl p-3 shadow-inner">
+                        <h4 class="text-[11px] font-extrabold uppercase tracking-wide text-indigo-200 mb-1 flex items-center gap-1">
+                            <i class="fa-solid fa-lightbulb text-amber-300"></i> 살림 고수의 비밀 치트키
+                        </h4>
+                        <p id="ai-protip" class="text-xs leading-relaxed text-indigo-50 font-medium"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="closeModal()" class="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl shadow-lg transition relative z-10">
+                기쁜 마음으로 수락하기!
+            </button>
+        </div>
+    </div>
+
+    <!-- 컨페티 효과를 위한 투명 캔버스 오버레이 -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-40 w-full h-full"></canvas>
+
+    <!-- 푸터 -->
+    <footer class="bg-white border-t border-slate-100 py-4 px-6 text-center text-xs text-slate-400">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>© 2026 집안 청소 룰렛. 재미로 돌리고 정성으로 쓰는 청소 도우미.</p>
+            <div class="flex gap-4">
+                <a href="#" class="hover:text-indigo-600 transition">사용 방법</a>
+                <a href="#" class="hover:text-indigo-600 transition">청소 팁</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 자바스크립트 소스코드 -->
+    <script>
+        // Gemini API Configuration
+        const apiKey = "";
+        
+        // --- 룰렛 상태 및 데이터 정의 ---
+        let items = [
+            { text: "설거지 🍽️", color: "#FFADAD" },
+            { text: "분리수거 버리기 ♻️", color: "#FFD6A5" },
+            { text: "욕실 청소하기 🚿", color: "#FDFFB6" },
+            { text: "청소기 돌리기 🧹", color: "#CAFFBF" },
+            { text: "빨래 널고 개기 👕", color: "#9BF6FF" },
+            { text: "방바닥 물걸레질 🧽", color: "#BDB2FF" }
+        ];
+
+        let presets = {
+            chores: [
+                { text: "설거지 🍽️", color: "#FFADAD" },
+                { text: "분리수거 버리기 ♻️", color: "#FFD6A5" },
+                { text: "욕실 청소하기 🚿", color: "#FDFFB6" },
+                { text: "청소기 돌리기 🧹", color: "#CAFFBF" },
+                { text: "빨래 널고 개기 👕", color: "#9BF6FF" },
+                { text: "방바닥 물걸레질 🧽", color: "#BDB2FF" }
+            ],
+            members: [
+                { text: "아빠 👨", color: "#A0C4FF" },
+                { text: "엄마 👩", color: "#FFC6FF" },
+                { text: "첫째 👦", color: "#9BF6FF" },
+                { text: "둘째 👧", color: "#CAFFBF" },
+                { text: "셋째 👶", color: "#FDFFB6" }
+            ],
+            penalties: [
+                { text: "딱밤 한 대 맞기 💥", color: "#FFADAD" },
+                { text: "저녁 설거지 독점 🍽️", color: "#FFD6A5" },
+                { text: "엉덩이로 이름 쓰기 🍑", color: "#FDFFB6" },
+                { text: "간식 한턱 쏘기 💸", color: "#CAFFBF" },
+                { text: "한 판 더 돌려 면제받기 🔄", color: "#9BF6FF" },
+                { text: "청소 면제권! 프리덤 🎉", color: "#FFFFFC" }
+            ]
+        };
+
+        // 파스텔톤 컬러 테이블
+        const pastelColors = [
+            '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF',
+            '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFFFFC'
+        ];
+
+        let isSpinning = false;
+        let soundEnabled = true;
+        let spinAngleStart = 0;
+        let startAngle = 0;
+        let spinTime = 0;
+        let spinTimeTotal = 0;
+        let currentWinner = ""; // AI API 연동용 글로벌 변수
+
+        // 오디오 컨텍스트 (브라우저 정책 우회를 위해 첫 동작 시 활성화)
+        let audioCtx = null;
+
+        // 컨벤션 세팅
+        const canvas = document.getElementById('rouletteCanvas');
+        const ctx = canvas.getContext('2d');
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+
+        // 세션 내 히스토리 보관 (localStorage 지침에 대응하여 메모리 저장소 사용)
+        let historySession = [];
+
+        // --- 초기 구동 ---
+        window.onload = function() {
+            initConfettiResize();
+            renderRoulette();
+            updateItemsList();
+            loadHistory();
+            initInteractiveClick();
+        };
+
+        // --- Web Audio API를 활용한 효과음 합성 ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 째깍거리는 핀 사운드
+        function playTickSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.04);
+        }
+
+        // 성공 축하 팡파레 사운드
+        function playWinSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50]; // 도, 미, 솔, 도, 미, 솔, 높은 도
+            notes.forEach((freq, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.08);
+                gain.gain.setValueAtTime(0.06, audioCtx.currentTime + index * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + index * 0.08 + 0.25);
+                
+                osc.start(audioCtx.currentTime + index * 0.08);
+                osc.stop(audioCtx.currentTime + index * 0.08 + 0.25);
+            });
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-btn');
+            if (soundEnabled) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-high text-lg"></i>';
+                btn.classList.remove('text-slate-400');
+                btn.classList.add('text-indigo-600', 'bg-indigo-50');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-lg"></i>';
+                btn.classList.add('text-slate-400');
+                btn.classList.remove('text-indigo-600', 'bg-indigo-50');
+            }
+        }
+
+        // --- 프리셋 변경 기능 ---
+        function loadPreset(key) {
+            if (isSpinning) return;
+            items = JSON.parse(JSON.stringify(presets[key]));
+            renderRoulette();
+            updateItemsList();
+            
+            const status = document.getElementById('status-message');
+            let text = "프리셋이 성공적으로 로드되었습니다.";
+            if (key === 'chores') text = "🧹 대표적인 집안 청소 리스트가 로드되었습니다.";
+            if (key === 'members') text = "👨‍👩‍👧‍👦 가족 구성원 목록이 성공적으로 적용되었습니다.";
+            if (key === 'penalties') text = "🔥 긴장감 넘치는 이색적인 벌칙 세트가 준비되었습니다.";
+            status.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-500 mr-1.5"></span> ${text}`;
+        }
+
+        // --- 룰렛 그리기 로직 (Canvas) ---
+        function renderRoulette() {
+            const numSegments = items.length;
+            if (numSegments === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#64748b";
+                ctx.font = "bold 16px 'Noto Sans KR'";
+                ctx.textAlign = "center";
+                ctx.fillText("오른쪽 리스트에 항목을 추가해주세요!", canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            const arcSize = (2 * Math.PI) / numSegments;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 외부 테두리 및 입체감 표현
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "rgba(15, 23, 42, 0.08)";
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, (canvas.width / 2) - 2, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0; // 초기화
+
+            // 각 조각(세그먼트) 그리기
+            for (let i = 0; i < numSegments; i++) {
+                const angle = startAngle + i * arcSize;
+                ctx.fillStyle = items[i].color;
+
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, canvas.height / 2);
+                ctx.arc(canvas.width / 2, canvas.height / 2, (canvas.width / 2) - 10, angle, angle + arcSize, false);
+                ctx.lineTo(canvas.width / 2, canvas.height / 2);
+                ctx.fill();
+
+                // 조각 사이의 경계선
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // 텍스트 회전하여 얹기
+                ctx.save();
+                ctx.fillStyle = "#0f172a";
+                ctx.font = "bold 13px 'Noto Sans KR'";
+                ctx.textAlign = "right";
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate(angle + arcSize / 2);
+                
+                const text = items[i].text;
+                const truncatedText = text.length > 8 ? text.slice(0, 7) + ".." : text;
+                ctx.fillText(truncatedText, (canvas.width / 2) - 30, 5);
+                ctx.restore();
+            }
+
+            // 외부 경계 둥글게 원형 링 마무리
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, (canvas.width / 2) - 5, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+
+        // --- 룰렛 회전 물리 엔진 ---
+        function spinWheel() {
+            if (isSpinning || items.length === 0) return;
+            initAudio();
+
+            // AI 섹션 리셋
+            document.getElementById('ai-btn').classList.remove('hidden');
+            document.getElementById('ai-loading').classList.add('hidden');
+            document.getElementById('ai-error').classList.add('hidden');
+            document.getElementById('ai-content').classList.add('hidden');
+
+            isSpinning = true;
+            document.getElementById('spin-btn').disabled = true;
+            document.getElementById('spin-btn').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('spin-center-btn').disabled = true;
+            document.getElementById('rouletteCanvas').classList.add('spinning');
+
+            spinAngleStart = Math.random() * 10 + 15;
+            spinTime = 0;
+            spinTimeTotal = Math.random() * 3000 + 4000;
+
+            rotateWheel();
+        }
+
+        let lastTickSegment = -1;
+        function rotateWheel() {
+            spinTime += 20;
+            if (spinTime >= spinTimeTotal) {
+                stopRotateWheel();
+                return;
+            }
+
+            const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+            startAngle += (spinAngle * Math.PI / 180);
+            renderRoulette();
+
+            const numSegments = items.length;
+            const arcSize = (2 * Math.PI) / numSegments;
+            const currentSegment = Math.floor((Math.PI * 1.5 - startAngle) / arcSize) % numSegments;
+            const normalizedSegment = currentSegment < 0 ? currentSegment + numSegments : currentSegment;
+            
+            if (normalizedSegment !== lastTickSegment) {
+                playTickSound();
+                lastTickSegment = normalizedSegment;
+            }
+
+            requestAnimationFrame(rotateWheel);
+        }
+
+        function easeOut(t, b, c, d) {
+            const ts = (t /= d) * t;
+            const tc = ts * t;
+            return b + c * (tc + -3 * ts + 3 * t);
+        }
+
+        // --- 회전 종료 및 당첨 알림 ---
+        function stopRotateWheel() {
+            isSpinning = false;
+            document.getElementById('spin-btn').disabled = false;
+            document.getElementById('spin-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('spin-center-btn').disabled = false;
+            document.getElementById('rouletteCanvas').classList.remove('spinning');
+
+            const numSegments = items.length;
+            let degrees = (startAngle * 180 / Math.PI) + 90;
+            let index = Math.floor((360 - (degrees % 360)) / (360 / numSegments));
+            if (index < 0) index = index + numSegments;
+            index = index % numSegments;
+
+            currentWinner = items[index].text;
+            
+            document.getElementById('status-message').innerHTML = `
+                <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 mr-1.5"></span> 당첨 완료! 🎉
+            `;
+
+            playWinSound();
+            startConfetti();
+            openModal(currentWinner);
+            addHistory(currentWinner);
+        }
+
+        // --- 커스텀 결과창 모달 핸들러 ---
+        function openModal(winner) {
+            const modal = document.getElementById('result-modal');
+            const content = document.getElementById('modal-content');
+            document.getElementById('modal-winner-text').innerText = winner;
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('result-modal');
+            const content = document.getElementById('modal-content');
+            
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            
+            stopConfetti();
+        }
+
+        // --- 항목 추가 및 리스트 관리 ---
+        function addItem(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-item-input');
+            const text = input.value.trim();
+            
+            if (text === "") return;
+            if (items.length >= 16) {
+                alert("원활한 동작과 심미성을 위해 룰렛 항목은 최대 16개까지만 등록 가능합니다.");
+                return;
+            }
+
+            const colorIndex = items.length % pastelColors.length;
+            const newColor = pastelColors[colorIndex];
+
+            items.push({ text: text, color: newColor });
+            input.value = "";
+            
+            renderRoulette();
+            updateItemsList();
+        }
+
+        function removeItem(index) {
+            if (isSpinning) return;
+            items.splice(index, 1);
+            renderRoulette();
+            updateItemsList();
+        }
+
+        function editItemText(index, value) {
+            items[index].text = value;
+            renderRoulette();
+        }
+
+        function updateItemsList() {
+            const listContainer = document.getElementById('items-list');
+            const counter = document.getElementById('item-count');
+            
+            counter.innerText = `항목 ${items.length}개`;
+            listContainer.innerHTML = "";
+
+            if (items.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-6 text-sm text-slate-400">
+                        현재 등록된 항목이 없습니다.<br>위 빈칸에서 새로운 항목을 추가해보세요!
+                    </div>
+                `;
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "flex items-center justify-between gap-2 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition group";
+                
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-2.5 flex-grow">
+                        <div class="w-4 h-4 rounded-full shadow-sm shrink-0" style="background-color: ${item.color}"></div>
+                        <input type="text" value="${item.text}" oninput="editItemText(${index}, this.value)" class="bg-transparent border-none text-sm font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-1 w-full">
+                    </div>
+                    <button onclick="removeItem(${index})" class="text-slate-400 hover:text-rose-600 transition p-1 opacity-0 group-hover:opacity-100 focus:opacity-100">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        function resetRoulette() {
+            if (isSpinning) return;
+            items = [];
+            renderRoulette();
+            updateItemsList();
+            document.getElementById('status-message').innerHTML = `
+                <span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400 mr-1.5"></span> 룰렛이 깨끗이 비워졌습니다.
+            `;
+        }
+
+        // --- 히스토리 관리 (메모리 변수로 안전하게 교체) ---
+        function addHistory(winner) {
+            const timestamp = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+            historySession.unshift({ winner, timestamp });
+            if (historySession.length > 10) historySession.pop();
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = "";
+
+            if (historySession.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">아직 당첨 이력이 없습니다.</p>`;
+                return;
+            }
+
+            historySession.forEach(item => {
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center bg-slate-50 border border-slate-100 py-2.5 px-3.5 rounded-xl";
+                row.innerHTML = `
+                    <span class="text-sm font-bold text-slate-700 truncate max-w-[180px]">${item.winner}</span>
+                    <span class="text-xxs text-slate-400">${item.timestamp} 당첨</span>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function clearHistory() {
+            historySession = [];
+            loadHistory();
+        }
+
+        // --- 🪐 Gemini API를 이용한 ✨AI 청소 비서 연동 기능 ---
+        async function fetchGeminiCoaching(taskName) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const prompt = `"${taskName}"에 대한 10분 속성 청소 처방전을 내려주세요.`;
+            const systemInstruction = `당신은 위트 넘치고 꼼꼼한 AI 청소 비서입니다. 사용자가 뽑은 집안일 항목에 대해, 마음을 움직이는 코믹하고 다정한 격려의 잔소리 한마디(nagging), 이를 빠르게 끝낼 수 있는 3단계 초간단 속성 가이드(steps - 3개 항목 문자열 배열), 그리고 살림 고수만 아는 유용한 꿀팁(proTip)을 친절하고 다정한 한국어로 제공해야 합니다. 반드시 지정된 JSON 포맷을 엄수하세요.`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            nagging: { type: "STRING", description: "위트 있고 코믹한 다정한 격려 한마디" },
+                            steps: {
+                                type: "ARRAY",
+                                items: { type: "STRING" },
+                                description: "10분 만에 청소를 끝내기 위한 단계별 3단 가이드"
+                            },
+                            proTip: { type: "STRING", description: "살림 고수만 알고 있는 특별한 청소 꿀팁" }
+                        },
+                        required: ["nagging", "steps", "proTip"]
+                    }
+                }
+            };
+
+            let delay = 1000;
+            // 지수 백오프 기반 최대 5회 재시도 (1s, 2s, 4s, 8s, 16s)
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        return JSON.parse(resultText);
+                    }
+                } catch (e) {
+                    // Fail silently and retry
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+            }
+            throw new Error("AI 호출 실패");
+        }
+
+        async function getAICoaching() {
+            const aiBtn = document.getElementById('ai-btn');
+            const aiLoading = document.getElementById('ai-loading');
+            const aiError = document.getElementById('ai-error');
+            const aiContent = document.getElementById('ai-content');
+
+            // UI 변경 (로딩 표시)
+            aiBtn.classList.add('hidden');
+            aiLoading.classList.remove('hidden');
+            aiError.classList.add('hidden');
+            aiContent.classList.add('hidden');
+
+            try {
+                const data = await fetchGeminiCoaching(currentWinner);
+                
+                // 데이터 매핑
+                document.getElementById('ai-nagging').innerText = data.nagging;
+                document.getElementById('ai-protip').innerText = data.proTip;
+                
+                const stepsOl = document.getElementById('ai-steps');
+                stepsOl.innerHTML = "";
+                data.steps.forEach(step => {
+                    const li = document.createElement('li');
+                    li.className = "py-0.5 leading-relaxed";
+                    li.innerText = step;
+                    stepsOl.appendChild(li);
+                });
+
+                // 성공 UI 적용
+                aiLoading.classList.add('hidden');
+                aiContent.classList.remove('hidden');
+            } catch (err) {
+                // 에러 UI 적용
+                aiLoading.classList.add('hidden');
+                aiError.classList.remove('hidden');
+                aiBtn.classList.remove('hidden');
+            }
+        }
+
+        // --- 리얼 캔버스 폭죽(Firework) 애니메이션 엔진 ---
+        let fireworks = [];
+        let particles = [];
+        let confettiInterval = null;
+        let fireworkTimer = 0;
+
+        // 10초 스페셜 불꽃 쇼 타이머 시스템
+        let celebrationActive = false;
+        let celebrationTimer = null;
+        let celebrationCountdown = 10;
+
+        const fireworkColors = [
+            '#FF007F', '#00F0FF', '#7F00FF', '#39FF14', '#FFDF00', '#FF5F1F', '#FF3131', '#FFF'
+        ];
+
+        function initConfettiResize() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+            window.addEventListener('resize', () => {
+                confettiCanvas.width = window.innerWidth;
+                confettiCanvas.height = window.innerHeight;
+            });
+        }
+
+        // 폭죽 발사체 (로켓) 클래스
+        class FireworkRocket {
+            constructor(startX, startY, targetX, targetY, color) {
+                this.x = startX;
+                this.y = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.color = color;
+                
+                const dx = targetX - startX;
+                const dy = targetY - startY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                this.vx = Math.cos(angle) * 11;
+                this.vy = Math.sin(angle) * 11;
+                
+                this.distanceToTarget = distance;
+                this.distanceTraveled = 0;
+                
+                this.trail = [];
+                this.trailLength = 8;
+            }
+
+            update() {
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > this.trailLength) {
+                    this.trail.shift();
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                const dx = this.x - (this.targetX - this.distanceToTarget * (this.vx / 11));
+                const dy = this.y - (this.targetY - this.distanceToTarget * (this.vy / 11));
+                this.distanceTraveled = Math.sqrt(dx * dx + dy * dy);
+
+                if (this.y <= this.targetY) {
+                    createExplosion(this.targetX, this.targetY, this.color);
+                    return false;
+                }
+                return true;
+            }
+
+            draw() {
+                confettiCtx.beginPath();
+                if (this.trail.length > 0) {
+                    confettiCtx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        confettiCtx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                } else {
+                    confettiCtx.moveTo(this.x, this.y);
+                }
+                confettiCtx.strokeStyle = this.color;
+                confettiCtx.lineWidth = 3.5;
+                confettiCtx.shadowBlur = 10;
+                confettiCtx.shadowColor = this.color;
+                confettiCtx.stroke();
+                confettiCtx.shadowBlur = 0;
+            }
+        }
+
+        // 폭죽 터진 후 조각 입자 클래스
+        class FireworkParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 7 + 3;
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.gravity = 0.12;
+                this.friction = 0.93;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.012 + 0.008;
+                
+                this.trail = [];
+                this.trailLength = 6;
+            }
+
+            update() {
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > this.trailLength) {
+                    this.trail.shift();
+                }
+
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                this.vy += this.gravity;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                this.alpha -= this.decay;
+                return this.alpha > 0;
+            }
+
+            draw() {
+                confettiCtx.save();
+                confettiCtx.globalAlpha = this.alpha;
+                confettiCtx.beginPath();
+                if (this.trail.length > 0) {
+                    confettiCtx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        confettiCtx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                } else {
+                    confettiCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+                }
+                confettiCtx.strokeStyle = this.color;
+                confettiCtx.lineWidth = Math.random() * 2.5 + 1.5;
+                confettiCtx.shadowBlur = 10;
+                confettiCtx.shadowColor = this.color;
+                confettiCtx.stroke();
+                confettiCtx.restore();
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            const particleCount = Math.floor(Math.random() * 30) + 65;
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new FireworkParticle(x, y, color));
+            }
+        }
+
+        function launchRocket(targetX = null, targetY = null) {
+            const startX = Math.random() * confettiCanvas.width;
+            const startY = confettiCanvas.height;
+            const tx = targetX !== null ? targetX : Math.random() * confettiCanvas.width * 0.8 + confettiCanvas.width * 0.1;
+            const ty = targetY !== null ? targetY : Math.random() * confettiCanvas.height * 0.45 + confettiCanvas.height * 0.1;
+            const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
+            
+            fireworks.push(new FireworkRocket(startX, startY, tx, ty, color));
+        }
+
+        // 당첨 시 최초 화려한 폭죽 개시 및 반복 타이머 작동
+        function startConfetti() {
+            fireworks = [];
+            particles = [];
+            celebrationActive = true;
+            celebrationCountdown = 10;
+            
+            for (let i = 0; i < 6; i++) {
+                setTimeout(() => {
+                    launchRocket(
+                        confettiCanvas.width * (0.15 + Math.random() * 0.7),
+                        confettiCanvas.height * (0.15 + Math.random() * 0.35)
+                    );
+                }, i * 150);
+            }
+
+            if (confettiInterval) clearInterval(confettiInterval);
+            fireworkTimer = 0;
+            confettiInterval = setInterval(animateConfetti, 1000 / 60);
+
+            if (celebrationTimer) clearInterval(celebrationTimer);
+
+            celebrationTimer = setInterval(() => {
+                celebrationCountdown--;
+                if (celebrationCountdown <= 0) {
+                    clearInterval(celebrationTimer);
+                    celebrationActive = false;
+                }
+            }, 1000);
+        }
+
+        function stopConfetti() {
+            if (confettiInterval) {
+                clearInterval(confettiInterval);
+                confettiInterval = null;
+            }
+            if (celebrationTimer) {
+                clearInterval(celebrationTimer);
+                celebrationTimer = null;
+            }
+            celebrationActive = false;
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            fireworks = [];
+            particles = [];
+        }
+
+        function animateConfetti() {
+            confettiCtx.fillStyle = 'rgba(240, 244, 248, 0.18)';
+            confettiCtx.fillRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            
+            fireworkTimer++;
+            
+            if (celebrationActive) {
+                if (fireworkTimer % 35 === 0) {
+                    launchRocket();
+                    if (Math.random() > 0.4) {
+                        setTimeout(() => launchRocket(), 150);
+                    }
+                }
+            }
+
+            fireworks = fireworks.filter(rocket => {
+                const active = rocket.update();
+                if (active) rocket.draw();
+                return active;
+            });
+
+            particles = particles.filter(p => {
+                const active = p.update();
+                if (active) p.draw();
+                return active;
+            });
+
+            if (!celebrationActive && fireworks.length === 0 && particles.length === 0) {
+                stopConfetti();
+            }
+        }
+
+        function initInteractiveClick() {
+            window.addEventListener('pointerdown', (e) => {
+                if (confettiInterval) {
+                    const rect = confettiCanvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+                    
+                    const modalContent = document.getElementById('modal-content');
+                    const modalRect = modalContent.getBoundingClientRect();
+                    if (
+                        e.clientX >= modalRect.left && e.clientX <= modalRect.right &&
+                        e.clientY >= modalRect.top && e.clientY <= modalRect.bottom
+                    ) {
+                        return;
+                    }
+
+                    const startX = Math.random() * confettiCanvas.width;
+                    const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
+                    fireworks.push(new FireworkRocket(startX, confettiCanvas.height, clickX, clickY, color));
+                }
+            });
+        }
+    </script>
+</body>
+</html>
